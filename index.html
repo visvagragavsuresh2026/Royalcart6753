@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Royal Delivery App</title>
+<style>
+:root{--bg:#fff8f0;--card:#fff;--tx:#2a1a12;--mut:#7a6a60;--red:#c8102e;--bd:#ecdcd0;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);color-scheme:light}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#1a1210;--card:#2a1d19;--tx:#f6ece6;--mut:#b5a199;--bd:#3d2c26;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#1a1210;--card:#2a1d19;--tx:#f6ece6;--mut:#b5a199;--bd:#3d2c26;color-scheme:dark}
+*{box-sizing:border-box}html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--tx);font-family:system-ui,-apple-system,Segoe UI,sans-serif;max-width:480px;margin:auto;min-height:100vh}
+header{background:var(--red);color:#fff;padding:14px 16px;font-weight:700;font-size:18px;display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;z-index:5}
+header button{background:none;border:1px solid #fff8;color:#fff;border-radius:8px;padding:4px 10px}
+.pad{padding:16px}
+input{width:100%;padding:12px;border:1px solid var(--bd);border-radius:10px;background:var(--card);color:var(--tx);font-size:16px;margin:10px 0}
+.btn{width:100%;padding:13px;border:0;border-radius:12px;background:var(--red);color:#fff;font-size:16px;font-weight:700}
+.btn.g{background:#fff;color:#222;border:1px solid #ccc}
+.item{display:flex;gap:12px;align-items:center;background:var(--card);border:1px solid var(--bd);border-radius:14px;padding:10px;margin:10px 0}
+.pic{width:64px;height:64px;border-radius:12px;background:#ffe9d6;display:grid;place-items:center;font-size:34px;flex:none}
+.info{flex:1}.info b{display:block}.info span{color:var(--mut);font-size:14px}
+.add{border:1.5px solid var(--red);color:var(--red);background:none;border-radius:8px;padding:6px 14px;font-weight:700}
+.qty{display:flex;align-items:center;gap:8px}.qty button{width:28px;height:28px;border-radius:50%;border:0;background:var(--red);color:#fff;font-size:18px}
+.bar{position:sticky;bottom:0;padding:10px 16px calc(10px + env(safe-area-inset-bottom,0px));background:var(--bg)}
+h3{margin:18px 0 4px}.mut{color:var(--mut);font-size:14px}
+.row{display:flex;justify-content:space-between;margin:8px 0}
+.ord{background:var(--card);border:1px solid var(--bd);border-radius:14px;padding:12px;margin:10px 0}
+.tag{display:inline-block;padding:2px 10px;border-radius:99px;background:#ffe3a3;color:#5a3d00;font-size:12px}
+.tag.d{background:#bfeccb;color:#0b4a1f}
+.hide{display:none}
+</style>
+</head>
+<body>
+<header><span>👑 Royal Delivery App</span><button id="out" class="hide" onclick="logout()">Logout</button></header>
+<main id="app"></main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script>
+// Demo sign-in only: this does NOT verify a Google account.
+const DELIVERY=["royalcartpayaluga@gmail.com"];
+const UPI_ID="visvag.sigmaphotograghy.2013@okhdfcbank";
+const ITEMS=[
+ {n:"Pencil",p:3,e:"✏️"},{n:"Eraser",p:3,e:"🧽"},{n:"Sharpener",p:2,e:"🔧"},
+ {n:"Scale",p:5,e:"📏"},{n:"Steel Scale",p:10,e:"📐"},{n:"Pen",p:10,e:"🖊️"},
+ {n:"Refill",p:5,e:"🖋️"},{n:"Notebook",p:30,e:"📓"},{n:"Glue Stick",p:15,e:"🧴"}
+];
+let user=null,cart={},orders=[];
+try{orders=JSON.parse(localStorage.getItem("rda_orders")||"[]")}catch(e){}
+const save=()=>{try{localStorage.setItem("rda_orders",JSON.stringify(orders))}catch(e){}};
+const $=h=>document.getElementById("app").innerHTML=h;
+const total=()=>ITEMS.reduce((s,i)=>s+(cart[i.n]||0)*i.p,0);
+const count=()=>Object.values(cart).reduce((a,b)=>a+b,0);
+
+function login(){
+ $(`<div class="pad"><h2>Welcome 👋</h2><p class="mut">Enter your Gmail address and name to continue. This demo does not perform real Google sign-in.</p>
+ <input id="em" type="email" placeholder="you@gmail.com"><input id="nm" placeholder="Your name">
+ <button class="btn g" onclick="doLogin()">Continue</button>
+ <p class="mut">Registered delivery members see the delivery screen. Other users order as customers.</p></div>`)
+}
+function doLogin(){
+ const em=document.getElementById("em").value.trim().toLowerCase(),nm=document.getElementById("nm").value.trim()||"Friend";
+ if(!/^\S+@\S+\.\S+$/.test(em)){alert("Enter a valid email");return}
+ user={em,nm,role:DELIVERY.includes(em)?"delivery":"customer"};
+ document.getElementById("out").classList.remove("hide");
+ user.role==="delivery"?delivery():menu()
+}
+function logout(){user=null;cart={};document.getElementById("out").classList.add("hide");login()}
+
+function menu(){
+ $(`<div class="pad"><b>Hi ${escapeHtml(user.nm)} 👋</b><h3>Stationery Menu</h3>
+ ${ITEMS.map((i,k)=>`<div class="item"><div class="pic">${i.e}</div><div class="info"><b>${i.n}</b><span>₹${i.p}</span></div><div id="c${k}"></div></div>`).join("")}
+ <h3>My Orders</h3>${myOrders()}</div><div class="bar" id="bar"></div>`);
+ ITEMS.forEach((_,k)=>ctl(k));bar()
+}
+function escapeHtml(s){return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
+function ctl(k){const n=ITEMS[k].n,q=cart[n]||0;document.getElementById("c"+k).innerHTML=q?`<div class="qty"><button onclick="chg(${k},-1)">−</button><b>${q}</b><button onclick="chg(${k},1)">+</button></div>`:`<button class="add" onclick="chg(${k},1)">ADD</button>`}
+function chg(k,d){const n=ITEMS[k].n;cart[n]=Math.max(0,(cart[n]||0)+d);ctl(k);bar()}
+function bar(){const b=document.getElementById("bar");if(b)b.innerHTML=count()?`<button class="btn" onclick="checkout()">View Cart · ${count()} items · ₹${total()}</button>`:""}
+function myOrders(){const m=orders.filter(o=>o.em===user.em);return m.length?m.map(o=>`<div class="ord"><b>#${o.id}</b> <span class="tag">${o.st}</span><div class="mut">${o.lines} · ₹${o.t}</div></div>`).join(""):`<p class="mut">No orders yet.</p>`}
+
+function checkout(){
+ $(`<div class="pad"><h3>Your Cart</h3>${ITEMS.filter(i=>cart[i.n]).map(i=>`<div class="row"><span>${i.n} × ${cart[i.n]}</span><b>₹${cart[i.n]*i.p}</b></div>`).join("")}
+ <hr><div class="row"><b>Total</b><b>₹${total()}</b></div>
+ <button class="btn" style="background:#1a73e8" onclick="details()">Continue · ₹${total()}</button>
+ <button class="btn g" style="margin-top:10px" onclick="menu()">← Back</button></div>`)
+}
+let who="",full="";
+function bill(){return ITEMS.filter(i=>cart[i.n]).map(i=>`<div class="row"><span>${i.n} × ${cart[i.n]}</span><b>₹${cart[i.n]*i.p}</b></div>`).join("")+`<hr><div class="row"><b>Total</b><b>₹${total()}</b></div>`}
+function details(){
+ $(`<div class="pad"><h3>Delivery details</h3><div class="ord">${bill()}</div>
+ <input id="nm2" placeholder="Your name"><input id="cl" inputmode="numeric" placeholder="Class"><input id="sc" placeholder="Section">
+ <button class="btn" style="background:#1a73e8" onclick="toPay()">Continue to pay ₹${total()}</button>
+ <button class="btn g" style="margin-top:10px" onclick="checkout()">← Back</button></div>`)
+}
+function toPay(){
+ const n=document.getElementById("nm2").value.trim(),c=document.getElementById("cl").value.trim(),s=document.getElementById("sc").value.trim();
+ if(!n||!c||!s){alert("Enter name, class and section");return}
+ who=n+" - Class "+c+" "+s.toUpperCase();pay()
+}
+function copyText(value,msg){if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(value).then(()=>alert(msg),()=>alert(value))}else{alert(value)}}
+function copyNote(){copyText(full,"Order note copied!")}
+function copyUpi(){copyText(UPI_ID,"UPI ID copied!")}
+function pay(){
+ const note=ITEMS.filter(i=>cart[i.n]).map(i=>i.n+" x"+cart[i.n]).join(", ");
+ full=ITEMS.filter(i=>cart[i.n]).map(i=>i.n+" x"+cart[i.n]+" = Rs"+cart[i.n]*i.p).join(", ")+" | Total Rs"+total()+" | "+who;
+
+ // Standard UPI intent with each value encoded individually.
+ const link="upi://pay?" +
+   "pa="+encodeURIComponent(UPI_ID) +
+   "&pn="+encodeURIComponent("Royal Delivery") +
+   "&am="+encodeURIComponent(String(total())) +
+   "&cu=INR" +
+   "&tn="+encodeURIComponent((who+": "+note).slice(0,50));
+
+ $(`<div class="pad" style="text-align:center"><h2>Pay ₹${total()}</h2>
+ <div class="ord" style="text-align:left">${bill()}<div class="mut">${escapeHtml(who)}</div>
+ <button class="add" style="margin-top:8px" onclick="copyNote()">📋 Copy order note</button></div>
+ <p class="mut">Choose Google Pay or another UPI app. Check the recipient name and UPI ID before approving any payment.</p>
+ <a href="${link}" class="btn" style="display:block;text-align:center;text-decoration:none;background:#1a73e8;margin-bottom:10px">Pay using UPI · Choose app</a>
+ <p class="mut">If the app chooser does not open, use the QR code or copy the UPI ID below.</p>
+ <div style="display:inline-block;background:#fff;padding:10px;border-radius:12px;margin-bottom:10px" id="qr"></div>
+ <div class="ord" style="text-align:left"><div class="mut">UPI ID</div><b style="word-break:break-all">${UPI_ID}</b><br>
+ <button class="add" style="margin-top:8px" onclick="copyUpi()">📋 Copy UPI ID</button></div>
+ <p class="mut">This demo cannot verify payment automatically. Confirm receipt in the official payment history before treating an order as paid.</p>
+ <button class="btn g" onclick="details()">← Back</button></div>`);
+ setTimeout(()=>{const el=document.getElementById("qr");if(el&&window.QRCode){try{new QRCode(el,{text:link,width:190,height:190})}catch(e){el.textContent="QR unavailable"}}},50)
+}
+
+function delivery(){
+ $(`<div class="pad"><b>E-cart Delivery · ${escapeHtml(user.nm)}</b><h3>Incoming Orders</h3>
+ ${orders.length?orders.map((o,k)=>`<div class="ord"><b>#${o.id}</b> <span class="tag">${o.st}</span>
+ <div>${escapeHtml(o.lines)}</div><div class="mut">${escapeHtml(o.nm)} · ${escapeHtml(o.loc)} · ₹${o.t}</div></div>`).join(""):`<p class="mut">No orders stored on this device.</p>`}
+ <p class="mut">This is a local demo. Orders are not shared between phones or devices.</p>
+ <button class="btn g" onclick="delivery()">Refresh</button></div>`)
+}
+login();
+</script>
+</body>
+</html>
